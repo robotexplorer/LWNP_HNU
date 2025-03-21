@@ -75,7 +75,6 @@ class REDC3DBNRES_NL(torch.nn.Module):
                 channels *= 2
             self.encoder.append(encoder_layer)
         # Decoder
-        #channels = 64
         self.decoder = nn.ModuleList()
         for i in range(1, num_half_layer + 1):
             if i % interval:
@@ -105,22 +104,3 @@ class REDC3DBNRES_NL(torch.nn.Module):
         out = self.reconstructor(out)
         out = self.enl_3(out) + xs.pop()
         return out
-
-
-if __name__ == '__main__':
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
-    import time
-    from thop import profile
-
-    device = torch.device('cuda')
-
-    img = torch.randn(1,3,256,256).to(device)
-    net = LWNP().cuda()
-    flops, model_size = profile(net, inputs = (img.to(device),))
-    print('------- FLOPs: {:.3f}'.format(flops/1000**3),'Size: {:.3f} MB'.format(model_size ))
-    start_time = time.time()
-    out = net(img)
-    end_time = time.time()
-    print(out.size(),end_time-start_time)
