@@ -21,23 +21,22 @@ class EfficientNL(nn.Module):
 
     def forward(self, input_):
         n, _,c, h, w = input_.size()
-        keys = self.keys(input_).reshape((n, self.key_channels,-1))#[1, 8, 327680]
-        queries = self.queries(input_).reshape(n, self.key_channels, -1)#[1, 8, 327680]
-        values = self.values(input_).reshape((n, self.value_channels, -1))#[1, 8, 327680]
+        keys = self.keys(input_).reshape((n, self.key_channels,-1))
+        queries = self.queries(input_).reshape(n, self.key_channels, -1)
+        values = self.values(input_).reshape((n, self.value_channels, -1))
         head_key_channels = self.key_channels // self.head_count#8/2=4
         head_value_channels = self.value_channels // self.head_count#8/2=4
 
         attended_values = []
         for i in range(self.head_count):
-            key = F.softmax(keys[:,i * head_key_channels: (i + 1) * head_key_channels,:], dim=2)#[1, 4, 327680]
-            query = F.softmax(queries[:,i * head_key_channels: (i + 1) * head_key_channels,:], dim=1)#[1, 4, 327680]
-            value = values[:,i * head_value_channels: (i + 1) * head_value_channels,:]#[1, 4, 327680]
-            context = key @ value.transpose(1, 2)#[1,4,4]
+            key = F.softmax(keys[:,i * head_key_channels: (i + 1) * head_key_channels,:], dim=2)
+            query = F.softmax(queries[:,i * head_key_channels: (i + 1) * head_key_channels,:], dim=1)
+            value = values[:,i * head_value_channels: (i + 1) * head_value_channels,:]
+            context = key @ value.transpose(1, 2)
             attended_value = (context.transpose(1, 2) @ query).reshape(n, head_value_channels,c, h, w)
             attended_values.append(attended_value)
 
         aggregated_values = torch.cat(attended_values, dim=1)
-        print('aggregated_values.shape=',aggregated_values.shape)
         reprojected_value = self.reprojection(aggregated_values)
         attention = reprojected_value + input_
         return attention
@@ -117,7 +116,6 @@ class NLBlockND(nn.Module):
             g_x = self.p(g_x)
         g_x=g_x.view(batch_size, self.inter_channels, -1)
         g_x = g_x.permute(0, 2, 1)
-        # print(self.mode)
         if self.mode == "gaussian":
             theta_x = x.view(batch_size, self.in_channels, -1)
             phi_x = x.view(batch_size, self.in_channels, -1)
@@ -212,23 +210,4 @@ class Nonlocal(nn.Module):
     def __repr__(self):
         return '{}({}, nl_c={}, nl_s={}'.format(self._get_name(),self.n_feature, self.nl_c,self.nl_s)
 
-if __name__ == '__main__':
-    import torch
-    import time
-    from thop import profile
-
-    img = torch.randn(1, 1, 5, 256, 256)
-    # net = EfficientNL(in_channels=16)
-    # net = Nonlocal(n_feature=1, nl_c=1, nl_cs=1,nl_s=2)
-    # net = nn.Conv3d(16,16,(1,3,3),1, padding=(0,1,1),groups=16,bias=False)
-    net = nn.BatchNorm3d(1)
-    # net = nn.LeakyReLU(0.2)
-    # net = nn.Conv3d(16,8,1)
-    # net = torch.nn.functional.softmax()
-    flops, model_size = profile(net, inputs = (img,))
-    print('------- FLOPs: {:.13f}'.format(flops),'Size: {:.3f} MB'.format(model_size ))#/1000**3
-    start_time = time.time()
-    out = net(img)
-    end_time = time.time()
-    print(out.size(),end_time-start_time)
 
